@@ -5,7 +5,7 @@ export const HistoryContext = createContext();
 export const HistoryProvider = ({ children }) => {
   const [history, setHistory] = useState([]);
 
-  const addToHistory = (source, translated, sourceLang, targetLang) => {
+  const addHistory = (source, translated, sourceLang, targetLang) => {
     const time = new Date().toLocaleString();
     setHistory(prev => [
       { id: Date.now(), source, translated, sourceLang, targetLang, time },
@@ -14,7 +14,7 @@ export const HistoryProvider = ({ children }) => {
   };
 
   return (
-    <HistoryContext.Provider value={{ history, addToHistory }}>
+    <HistoryContext.Provider value={{ history, addHistory }}>
       {children}
     </HistoryContext.Provider>
   );

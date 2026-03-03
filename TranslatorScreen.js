@@ -243,6 +243,8 @@
 // TranslatorScreen.js
 import 'react-native-gesture-handler';
 import React, { useState, useContext } from 'react';
+import { Audio } from "expo-av";
+import axios from 'axios';
 import {
   View,
   Text,
@@ -255,55 +257,149 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { HistoryContext } from './HistoryContext'; // import context
+import {translateParallel } from './services/translationOrchestrator';
 
 export default function TranslatorScreen({ navigation }) {
   const { addHistory } = useContext(HistoryContext); // get function from context
 
   const [text, setText] = useState('');
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [sourceLang, setSourceLang] = useState('en');
-  const [targetLang, setTargetLang] = useState('es');
+  const [targetLang, setTargetLang] = useState('hi');
 
   const [openSource, setOpenSource] = useState(false);
   const [openTarget, setOpenTarget] = useState(false);
-
+ //need to change this to indian langauges.
   const languages = [
-    { label: 'English', value: 'en' },
-    { label: 'Spanish', value: 'es' },
-    { label: 'French', value: 'fr' },
-    { label: 'German', value: 'de' },
-    { label: 'Hindi', value: 'hi' },
-    { label: 'Chinese', value: 'zh' },
-  ];
+  { label: 'English', value: 'en' },  
+  { label: 'Hindi', value: 'hi' },
+  { label: 'Marathi', value: 'mr' },
+  { label: 'Tamil', value: 'ta' },
+  { label: 'Telugu', value: 'te' },
+  { label: 'Bengali', value: 'bn' },
+  { label: 'Urdu', value: 'ur' },
+];
 
-  const sendMessage = () => {
-    if (!text) return;
+/*-------TEXT TRANSLATION LOGIC   ------*/
+ const sendMessage = async (inputText = text) => {
+  if (!inputText) return;
 
-    const translatedText = 'Translated text will appear here.'; // replace with actual translation
+  const userMessage = { type: 'user', text: inputText };
+  setMessages(prev => [...prev, userMessage]);
 
-    // Update chat messages
+  try {
+    setLoading(true);
+
+    const results = await translateParallel(inputText, sourceLang, targetLang);
+    const successful = results.filter(r => r.success);
+
+    if (successful.length > 0) {
+      setMessages(prev => [
+        ...prev,
+        {
+          type: "translated",
+          results: successful,
+          selectedIndex: 0
+        }
+      ]);
+
+      addHistory(inputText, successful[0].text, sourceLang, targetLang);
+    } else {
+      setMessages(prev => [
+        ...prev,
+        { type: 'translated', results: [], selectedIndex: 0 }
+      ]);
+    }
+
+  } catch (error) {
+    console.log("FULL ERROR:", error.response?.data || error.message);
     setMessages(prev => [
       ...prev,
-      { type: 'user', text },
-      { type: 'translated', text: translatedText }
+      { type: 'translated', results: [], selectedIndex: 0 }
     ]);
+  } finally {
+    setLoading(false);
+    setText('');
+  }
+};
 
-    // Add to global history
-    addHistory({
-      source: text,
-      translated: translatedText,
-      sourceLang,
-      targetLang,
-      time: new Date().toLocaleString(),
+/*----------TAB SWITCH--------*/
+  const changeTab = (msgIndex, tabIndex) => {
+    setMessages(prev => {
+      const updated = [...prev];
+      updated[msgIndex].selectedIndex = tabIndex;
+      return updated;
     });
-
-    setText(''); // clear input
   };
 
+/*----------AUDIO RECORDING-------*/
+const [recording, setRecording] = useState(null);
+const startRecording = async () => {
+    try {
+      await Audio.requestPermissionsAsync();
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
+      );
+
+      setRecording(recording);
+
+    } catch (err) {
+      console.log("Recording error:", err);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      await sendAudioToBackend(uri);
+
+    } catch (err) {
+      console.log("Stop recording error:", err);
+    }
+  };
+
+  const sendAudioToBackend = async (uri) => {
+    try {
+      const formData = new FormData();
+
+      formData.append("audio", {
+        uri,
+        name: "recording.wav",
+        type: "audio/wav",
+      });
+
+      const response = await axios.post(
+        "http://192.168.1.201:5000/transcribe",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      const transcribedText = response.data.text;
+
+      await sendMessage(transcribedText);
+
+    } catch (error) {
+      console.log("AUDIO ERROR:", error.response?.data || error.message);
+    }
+  };
+
+  /*-------- UI LOGIC --------*/
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <SafeAreaView style={styles.container}>
@@ -390,17 +486,61 @@ export default function TranslatorScreen({ navigation }) {
           style={styles.chatArea}
           contentContainerStyle={{ padding: 10, flexGrow: 1 }}
         >
-          {messages.map((msg, index) => (
-            <View
-              key={index}
-              style={[
-                styles.messageBubble,
-                msg.type === 'user' ? styles.userBubble : styles.translatedBubble
-              ]}
-            >
-              <Text style={{ color: msg.type === 'user' ? 'white' : 'black' }}>{msg.text}</Text>
-            </View>
-          ))}
+          {messages.map((msg, index) => {
+
+            if (msg.type === "user") {
+              return (
+                <View key={index} style={[styles.messageBubble, styles.userBubble]}>
+                  <Text style={{ color: "white" }}>{msg.text}</Text>
+                </View>
+              );
+            }
+
+            if (msg.type === "translated") {
+              return (
+                <View key={index} style={[styles.messageBubble, styles.translatedBubble]}>
+
+                  {msg.results.length > 0 ? (
+                    <>
+                      <View style={styles.tabRow}>
+                        {msg.results.map((res, i) => (
+                          <TouchableOpacity
+                            key={i}
+                            onPress={() => changeTab(index, i)}
+                            style={[
+                              styles.tabButton,
+                              msg.selectedIndex === i && styles.activeTab
+                            ]}
+                          >
+                            <Text style={{ fontSize: 12 }}>
+                              {res.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      <Text style={{ marginTop: 6 }}>
+                        {msg.results[msg.selectedIndex].text}
+                      </Text>
+
+                      <Text style={{ fontSize: 10, marginTop: 4 }}>
+                        {msg.results[msg.selectedIndex].time} ms
+                      </Text>
+                    </>
+                  ) : (
+                    <Text>No API responded successfully.</Text>
+                  )}
+
+                </View>
+              );
+            }
+
+            return null;
+          })}
+
+          {loading && (
+            <ActivityIndicator size="small" color="#007AFF" style={{ marginTop: 10}} />
+          )}
         </ScrollView>
 
         {/* Bottom Input Area */}
@@ -409,8 +549,13 @@ export default function TranslatorScreen({ navigation }) {
           style={styles.inputWrapper}
         >
           <View style={styles.inputArea}>
-            <TouchableOpacity onPress={() => alert('Mic clicked')} style={styles.micBtn}>
-              <Ionicons name="mic-outline" size={24} color="white" />
+            <TouchableOpacity 
+            onPress={recording ? stopRecording : startRecording} style={styles.micBtn}>
+              <Ionicons
+                name={recording ? "stop-circle" : "mic-outline"}
+                size={24}
+                color="white"
+              />
             </TouchableOpacity>
 
             <TextInput
@@ -421,7 +566,7 @@ export default function TranslatorScreen({ navigation }) {
               onChangeText={setText}
             />
 
-            <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
+            <TouchableOpacity onPress={() => sendMessage(text)} style={styles.sendBtn}>
               <MaterialIcons name="send" size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -485,8 +630,25 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
 
+  tabRow: {
+  flexDirection: "row",
+  marginBottom: 5,
+},
+
+tabButton: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  backgroundColor: "#ccc",
+  borderRadius: 10,
+  marginRight: 5,
+},
+
   inputWrapper: { paddingBottom: 20 },
 
+   activeTab: {
+    backgroundColor: "#007AFF",
+  },
+  
   inputArea: {
     flexDirection: 'row',
     paddingHorizontal: 10,
