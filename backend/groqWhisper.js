@@ -8,7 +8,7 @@ export const transcribeAudio = async (filePath) => {
 
     form.append("file", fs.createReadStream(filePath));
     form.append("model", "whisper-large-v3-turbo");
-
+    form.append("response_format", "json");
     const response = await axios.post(
       "https://api.groq.com/openai/v1/audio/transcriptions",
       form,

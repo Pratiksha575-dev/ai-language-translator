@@ -245,6 +245,7 @@ import 'react-native-gesture-handler';
 import React, { useState, useContext } from 'react';
 import { Audio } from "expo-av";
 import axios from 'axios';
+import * as Speech from "expo-speech";
 import {
   View,
   Text,
@@ -285,6 +286,14 @@ export default function TranslatorScreen({ navigation }) {
   { label: 'Bengali', value: 'bn' },
   { label: 'Urdu', value: 'ur' },
 ];
+
+const speechLangMap={
+  en:"en-US",
+  hi:"hi-IN",
+  mr:"mr-IN",
+  ta:"ta-IN",
+  te:"te-IN"
+}
 
 /*-------TEXT TRANSLATION LOGIC   ------*/
  const sendMessage = async (inputText = text) => {
@@ -398,6 +407,14 @@ const startRecording = async () => {
       console.log("AUDIO ERROR:", error.response?.data || error.message);
     }
   };
+
+  const speakText = (text,lang) => {
+  Speech.speak(text, {
+    language: speechLangMap[lang],
+    pitch: 1,
+    rate: 0.9
+  });
+};
 
   /*-------- UI LOGIC --------*/
   return (
@@ -519,10 +536,24 @@ const startRecording = async () => {
                         ))}
                       </View>
 
-                      <Text style={{ marginTop: 6 }}>
-                        {msg.results[msg.selectedIndex].text}
-                      </Text>
+                      <View style={{ marginTop: 6 }}>
+                          <Text style={{ flexWrap: "wrap" }}>
+                            {msg.results[msg.selectedIndex].text}
+                          </Text>
 
+                          <TouchableOpacity
+                            onPress={() =>
+                              speakText(
+                                msg.results[msg.selectedIndex].text,
+                                targetLang
+                              )
+                            }
+                            style={{ marginTop: 6 }}
+                          >
+                            <Ionicons name="volume-high-outline" size={20} color="#333" />
+                          </TouchableOpacity>
+
+                        </View>
                       <Text style={{ fontSize: 10, marginTop: 4 }}>
                         {msg.results[msg.selectedIndex].time} ms
                       </Text>
@@ -614,7 +645,7 @@ const styles = StyleSheet.create({
   chatArea: { flex: 1 },
 
   messageBubble: {
-    maxWidth: '80%',
+    maxWidth: '85%',
     padding: 10,
     borderRadius: 10,
     marginBottom: 10,

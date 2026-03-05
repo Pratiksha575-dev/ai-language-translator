@@ -78,8 +78,28 @@ app.post("/translate/google", async (req, res) => {
 app.post("/translate/groq", async (req, res) => {
   try {
     const { text, sourceLang, targetLang } = req.body;
+    const langNames = {
+  en: "English",
+  hi: "Hindi",
+  mr: "Marathi",
+  ta: "Tamil",
+  te: "Telugu",
+};
+    const prompt = `
+You are a professional translation engine.
+Translate the following text from ${langNames[sourceLang]} to ${langNames[targetLang]}.
 
-    const prompt = `Translate the following text from ${sourceLang} to ${targetLang}. Only give translation:\n${text}`;
+
+Rules:
+- Only output the translated sentence.
+- Reframe the sentence to suit the target language semantics if necessary.
+- Do not explain.
+- Do not add extra words.
+- Do not repeat the input.
+
+Text:
+${text}
+`;
 
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
