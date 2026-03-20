@@ -1,16 +1,33 @@
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const HistoryContext = createContext();
 
 export const HistoryProvider = ({ children }) => {
   const [history, setHistory] = useState([]);
 
-  const addHistory = (source, translated, sourceLang, targetLang) => {
-    const time = new Date().toLocaleString();
-    setHistory(prev => [
-      { id: Date.now(), source, translated, sourceLang, targetLang, time },
-      ...prev
-    ]);
+  /* LOAD FROM STORAGE */
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("history");
+        if (stored) {
+          setHistory(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.log("Load error", e);
+      }
+    };
+    loadData();
+  }, []);
+
+  /* SAVE TO STORAGE */
+  useEffect(() => {
+    AsyncStorage.setItem("history", JSON.stringify(history));
+  }, [history]);
+
+  const addHistory = (entry) => {
+    setHistory(prev => [entry, ...prev]);
   };
 
   return (

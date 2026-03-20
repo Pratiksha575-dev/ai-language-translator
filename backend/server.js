@@ -3,27 +3,50 @@ import axios from "axios";
 import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
-import FormData from "form-data";
 import fs from "fs";
-import {transcribeAudio} from "./groqWhisper.js";
+import { transcribeAudio } from "./groqWhisper.js";
+import Tesseract from "tesseract.js";
 
 dotenv.config();
-console.log("AWS REGION:", process.env.AWS_REGION);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const HF_TOKEN = process.env.HF_TOKEN;
-// Language map for NLLB
-const langMap = {
-  en: "eng_Latn",
-  hi: "hin_Deva",
-  mr: "mar_Deva",
-  ta: "tam_Taml",
-  te: "tel_Telu",
-  bn: "ben_Beng",
-  ur: "urd_Arab"
-};
+/* ---------------- MULTER (ONLY ONCE) ---------------- */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now();
+    const ext = file.originalname.split(".").pop();
+    cb(null, uniqueSuffix + "." + ext);
+  }
+});
+
+const upload = multer({ storage });
+
+/* ---------------- OCR API ---------------- */
+app.post("/ocr", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
+
+    const imagePath = req.file.path;
+
+    const result = await Tesseract.recognize(imagePath, "eng");
+
+    const extractedText = result.data.text;
+
+    fs.unlinkSync(imagePath); // ✅ cleanup
+
+    res.json({ text: extractedText });
+
+  } catch (err) {
+    console.log("OCR ERROR:", err);
+    res.status(500).json({ error: "OCR failed" });
+  }
+});
 
 /* ---------------- HELSINKI ---------------- */
 app.post("/translate/helsinki", async (req, res) => {
@@ -37,9 +60,9 @@ app.post("/translate/helsinki", async (req, res) => {
       { inputs: text },
       {
         headers: {
-          Authorization: `Bearer ${HF_TOKEN}`,
+          Authorization: `Bearer ${process.env.HF_TOKEN}`,
           "Content-Type": "application/json"
-        },
+        }
       }
     );
 
@@ -51,6 +74,7 @@ app.post("/translate/helsinki", async (req, res) => {
   }
 });
 
+/* ---------------- GOOGLE ---------------- */
 app.post("/translate/google", async (req, res) => {
   try {
     const { text, sourceLang, targetLang } = req.body;
@@ -74,28 +98,22 @@ app.post("/translate/google", async (req, res) => {
     res.status(500).json({ error: "Google failed" });
   }
 });
-/* ---------------- GROQ LLAMA ---------------- */
+
+/* ---------------- GROQ ---------------- */
 app.post("/translate/groq", async (req, res) => {
   try {
     const { text, sourceLang, targetLang } = req.body;
+
     const langNames = {
-  en: "English",
-  hi: "Hindi",
-  mr: "Marathi",
-  ta: "Tamil",
-  te: "Telugu",
-};
+      en: "English",
+      hi: "Hindi",
+      mr: "Marathi",
+      ta: "Tamil",
+      te: "Telugu"
+    };
+
     const prompt = `
-You are a professional translation engine.
-Translate the following text from ${langNames[sourceLang]} to ${langNames[targetLang]}.
-
-
-Rules:
-- Only output the translated sentence.
-- Reframe the sentence to suit the target language semantics if necessary.
-- Do not explain.
-- Do not add extra words.
-- Do not repeat the input.
+Translate from ${langNames[sourceLang]} to ${langNames[targetLang]}.
 
 Text:
 ${text}
@@ -105,9 +123,7 @@ ${text}
       "https://api.groq.com/openai/v1/chat/completions",
       {
         model: "llama-3.1-8b-instant",
-        messages: [
-          { role: "user", content: prompt }
-        ],
+        messages: [{ role: "user", content: prompt }],
         temperature: 0
       },
       {
@@ -128,43 +144,31 @@ ${text}
   }
 });
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now();
-    const ext = file.originalname.split(".").pop();
-    cb(null, uniqueSuffix + "." + ext);
-  }
-});
-
-const upload = multer({ storage });
+/* ---------------- AUDIO TRANSCRIBE ---------------- */
 app.post("/transcribe", upload.single("audio"), async (req, res) => {
   try {
-
     if (!req.file) {
-      console.log("No file received");
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    console.log("Uploaded file info:", req.file);
-
     const filePath = req.file.path;
-    console.log("File path:", filePath);
 
     const text = await transcribeAudio(filePath);
 
-    fs.unlinkSync(filePath);
+    fs.unlinkSync(filePath); // ✅ cleanup
 
     res.json({ text });
 
   } catch (error) {
-    console.log("TRANSCRIBE ERROR:", error.response?.data || error.message);
-    res.status(500).json({ error: "Transcription failed" });
+    console.log("TRANSCRIBE ERROR:", error.message);
+    res.status(500).json({
+      error: "Transcription failed",
+      errorDetails: error.message
+    });
   }
 });
 
+/* ---------------- START SERVER ---------------- */
 app.listen(5000, () => {
   console.log("Backend running on http://localhost:5000");
 });

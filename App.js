@@ -1,23 +1,26 @@
-import 'react-native-gesture-handler';
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import TranslatorScreen from './TranslatorScreen';
-import HistoryScreen from './HistoryScreen';
-import SettingsScreen from './SettingsScreen';
-import { HistoryProvider } from './HistoryContext'; // your provider
+import HomeScreen from "./HomeScreen";
+import ResearchHome from "./ResearchHome";
+import TranslatorScreen from "./TranslatorScreen";
+import AnalyticsScreen from "./AnalyticsScreen"; 
+import { HistoryProvider } from "./HistoryContext";
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <HistoryProvider> {/* Wrap all app screens in provider */}
+    <HistoryProvider>
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator initialRouteName="Home">
+
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="ResearchHome" component={ResearchHome} />
           <Stack.Screen name="Translator" component={TranslatorScreen} />
-          <Stack.Screen name="History" component={HistoryScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+
         </Stack.Navigator>
       </NavigationContainer>
     </HistoryProvider>
