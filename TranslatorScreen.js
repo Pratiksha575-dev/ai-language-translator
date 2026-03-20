@@ -22,6 +22,8 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import { HistoryContext } from './HistoryContext'; // import context
 import {translateParallel } from './services/translationOrchestrator';
 import * as ImagePicker from "expo-image-picker";
+import { Image } from "react-native";
+
 
 export default function TranslatorScreen({  navigation,route}) {
   const { addHistory } = useContext(HistoryContext); // get function from context
@@ -54,11 +56,13 @@ const speechLangMap={
 }
 
 /*-------TEXT TRANSLATION LOGIC   ------*/
-const sendMessage = async (inputText = text) => {
+const sendMessage = async (inputText = text,options={}) => {
   if (!inputText) return;
 
+  if (!options.silent) {
   const userMessage = { type: "user", text: inputText };
   setMessages(prev => [...prev, userMessage]);
+}
 
   try {
     setLoading(true);
@@ -171,7 +175,7 @@ const pickImageAndTranslate = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      alert("Permission required");
+      alert("Permission required to access gallery");
       return;
     }
 
@@ -184,32 +188,41 @@ const pickImageAndTranslate = async () => {
 
     const image = result.assets[0];
 
+    // 🔥 SHOW IMAGE IN CHAT ONLY
+    setMessages(prev => [
+      ...prev,
+      { type: "image", uri: image.uri }
+    ]);
+
     const formData = new FormData();
     formData.append("image", {
       uri: image.uri,
       type: "image/jpeg",
-      name: "photo.jpg",
+      name: "image.jpg"
     });
 
     setLoading(true);
 
-    const response = await fetch("http://192.168.1.201:5000/ocr", {
+    const ocrRes = await fetch("http://192.168.1.201:5000/ocr", {
       method: "POST",
       body: formData,
       headers: {
-        "Content-Type": "multipart/form-data",
-      },
+        "Content-Type": "multipart/form-data"
+      }
     });
 
-    const data = await response.json();
+    const data = await ocrRes.json();
 
-    console.log("OCR TEXT:", data.text);
+    // ❌ DO NOT SHOW OCR TEXT
+    // ✅ ONLY SEND FOR TRANSLATION
+    if (data.text) {
+      await sendMessage(data.text,{silent:true});
+    } else {
+      console.log("No text extracted from image");
+    }
 
-    // 🔥 send extracted text to translation
-    sendMessage(data.text);
-
-  } catch (error) {
-    console.log("OCR ERROR:", error);
+  } catch (err) {
+    console.log("IMAGE ERROR:", err);
   } finally {
     setLoading(false);
   }
@@ -381,7 +394,22 @@ const startRecording = async () => {
           contentContainerStyle={{ padding: 10, flexGrow: 1 }}
         >
           {messages.map((msg, index) => {
-
+            if (msg.type === "image") {
+                return (
+                  <View key={index} style={{ marginBottom: 10 }}>
+                    <Image
+                      source={{ uri: msg.uri }}
+                      style={{
+                        width: 220,
+                        height: 220,
+                        borderRadius: 10,
+                        alignSelf: "flex-end"
+                      }}
+                    />
+                  </View>
+                );
+              }
+            
             if (msg.type === "user") {
               return (
                 <View key={index} style={[styles.messageBubble, styles.userBubble]}>
