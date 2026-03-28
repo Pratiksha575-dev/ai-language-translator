@@ -175,7 +175,7 @@ const pickImageAndTranslate = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      alert("Permission required to access gallery");
+      alert("Permission required");
       return;
     }
 
@@ -188,7 +188,7 @@ const pickImageAndTranslate = async () => {
 
     const image = result.assets[0];
 
-    // 🔥 SHOW IMAGE IN CHAT
+    // ✅ Show image in chat
     setMessages(prev => [
       ...prev,
       { type: "image", uri: image.uri }
@@ -204,19 +204,25 @@ const pickImageAndTranslate = async () => {
     });
 
     formData.append("targetLang", targetLang);
-   console.log("Calling backend...");
-    // 🔥 GEMINI CALL
+
     const res = await fetch(
-      "https://yummy-hornets-share.loca.lt/image-translate-gemini",
+      "https://multi-modal-langauge-translator.onrender.com/image-translate-gemini",
       {
         method: "POST",
         body: formData
       }
     );
 
-    const data = await res.json();
+    const text = await res.text();
 
-    // 🔥 SHOW ONLY FINAL TRANSLATION
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.log("Invalid response:", text);
+      throw new Error("Server error");
+    }
+
     setMessages(prev => [
       ...prev,
       {
@@ -234,12 +240,11 @@ const pickImageAndTranslate = async () => {
     ]);
 
   } catch (err) {
-    console.log("IMAGE ERROR:", err);
+    console.log("IMAGE ERROR:", err.message);
   } finally {
     setLoading(false);
   }
 };
-
 /*----------TAB SWITCH--------*/
   const changeTab = (msgIndex, tabIndex) => {
     setMessages(prev => {
