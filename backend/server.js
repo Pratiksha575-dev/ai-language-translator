@@ -168,7 +168,71 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
   }
 });
 
+app.post("/image-translate-gemini", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
+
+    const imagePath = req.file.path;
+
+    const imageBase64 = fs.readFileSync(imagePath, { encoding: "base64" });
+
+    fs.unlinkSync(imagePath); // cleanup
+
+    const { targetLang } = req.body;
+
+    const langNames = {
+      en: "English",
+      hi: "Hindi",
+      mr: "Marathi",
+      ta: "Tamil",
+      te: "Telugu"
+    };
+
+    const prompt = `
+Translate ONLY the meaningful and important content from this image into ${langNames[targetLang]}.
+
+Rules:
+- Ignore decorative or repeated text
+- Ignore design elements
+- Keep output clean and natural
+- Do not explain anything
+`;
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: imageBase64
+                }
+              }
+            ]
+          }
+        ]
+      }
+    );
+
+    const output =
+  response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No text detected";
+  if (!output) {
+  return res.json({ translation: "No meaningful text found" });
+}
+    res.json({ translation: output });
+
+  } catch (error) {
+    console.log("GEMINI ERROR:", error.response?.data || error.message);
+    res.status(500).json({ error: "Gemini image translation failed" });
+  }
+});
+
 /* ---------------- START SERVER ---------------- */
-app.listen(5000, () => {
-  console.log("Backend running on http://localhost:5000");
+app.listen(5000,"0.0.0.0", () => {
+  console.log("Backend running on network");
 });

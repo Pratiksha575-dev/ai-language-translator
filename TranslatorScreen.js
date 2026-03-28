@@ -188,11 +188,13 @@ const pickImageAndTranslate = async () => {
 
     const image = result.assets[0];
 
-    // 🔥 SHOW IMAGE IN CHAT ONLY
+    // 🔥 SHOW IMAGE IN CHAT
     setMessages(prev => [
       ...prev,
       { type: "image", uri: image.uri }
     ]);
+
+    setLoading(true);
 
     const formData = new FormData();
     formData.append("image", {
@@ -201,25 +203,35 @@ const pickImageAndTranslate = async () => {
       name: "image.jpg"
     });
 
-    setLoading(true);
-
-    const ocrRes = await fetch("http://192.168.1.201:5000/ocr", {
-      method: "POST",
-      body: formData,
-      headers: {
-        "Content-Type": "multipart/form-data"
+    formData.append("targetLang", targetLang);
+   console.log("Calling backend...");
+    // 🔥 GEMINI CALL
+    const res = await fetch(
+      "https://yummy-hornets-share.loca.lt/image-translate-gemini",
+      {
+        method: "POST",
+        body: formData
       }
-    });
+    );
 
-    const data = await ocrRes.json();
+    const data = await res.json();
 
-    // ❌ DO NOT SHOW OCR TEXT
-    // ✅ ONLY SEND FOR TRANSLATION
-    if (data.text) {
-      await sendMessage(data.text,{silent:true});
-    } else {
-      console.log("No text extracted from image");
-    }
+    // 🔥 SHOW ONLY FINAL TRANSLATION
+    setMessages(prev => [
+      ...prev,
+      {
+        type: "translated",
+        results: [
+          {
+            name: "Gemini Vision",
+            text: data.translation || "No text detected",
+            time: 0,
+            success: true
+          }
+        ],
+        selectedIndex: 0
+      }
+    ]);
 
   } catch (err) {
     console.log("IMAGE ERROR:", err);
