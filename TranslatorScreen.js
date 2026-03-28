@@ -343,7 +343,7 @@ const startRecording = async () => {
   /*-------- UI LOGIC --------*/
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { flex: 1 }]}>
 
         {/* Top Bar */}
         <View style={styles.topBar}>
@@ -369,9 +369,18 @@ const startRecording = async () => {
 
             {/* Right icons */}
             <View style={{ flexDirection: "row" }}>
-              <Ionicons name="time-outline" size={24} color="white" style={{ marginRight: 10 }} />
+              <TouchableOpacity 
+              onPress={() => navigation.navigate("Settings")}
+              style={{ marginRight: 10 }}
+            >
               <Ionicons name="settings-outline" size={24} color="white" style={{ marginRight: 10 }} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+              placeholder={() => alert("Profile feature coming soon!")} 
+              style={{ marginRight: 10 }}
+            >
               <Ionicons name="person-circle-outline" size={26} color="white" />
+          </TouchableOpacity>
             </View>
 
           </View>
@@ -523,7 +532,7 @@ const startRecording = async () => {
               <View style={{
                 position: "absolute",
                 top: 0,
-                bottom: 0,
+                bottom: 70,
                 left: 0,
                 right: 0,
                 backgroundColor: "rgba(0,0,0,0.5)",
@@ -627,13 +636,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
 
   topBar: {
-    height: 80,
-    backgroundColor: '#1f1f1f',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding:12
-  },
+  paddingTop: Platform.OS === "android" ? 35 : 50,
+  paddingHorizontal: 12,
+  paddingBottom: 10,
+  backgroundColor: '#1f1f1f',
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
 
   title: { fontSize: 18, fontWeight: 'bold', color: 'white' },
 
@@ -688,7 +698,7 @@ tabButton: {
   marginRight: 5,
 },
 
-  inputWrapper: { paddingBottom: 20 },
+  inputWrapper: { paddingBottom: Platform.OS === "android" ? 10 : 20 },
 
    activeTab: {
     backgroundColor: "#007AFF",

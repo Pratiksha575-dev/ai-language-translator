@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "./HomeScreen";
 import TranslatorScreen from "./TranslatorScreen";
 import AnalyticsScreen from "./AnalyticsScreen";
+import SettingsScreen from "./SettingsScreen";
 import { HistoryProvider } from "./HistoryContext";
 
 const Stack = createNativeStackNavigator();
@@ -27,6 +28,12 @@ export default function App() {
             name="Analytics" 
             component={AnalyticsScreen}
             options={{ title: "Analysis & Insights" }}
+          />
+
+          <Stack.Screen 
+            name="Settings" 
+            component={SettingsScreen}
+            options={{ title: "Settings" }}
           />
 
         </Stack.Navigator>

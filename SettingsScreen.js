@@ -93,7 +93,7 @@ import { View, Text, Button, Switch, StyleSheet, Alert, TouchableOpacity } from 
 import { useNavigation } from '@react-navigation/native';
 
 export default function SettingsScreen() {
-  const navigation = useNavigation();
+  
   const [isDarkTheme, setIsDarkTheme] = useState(true); // dark theme by default
 
   const toggleTheme = () => setIsDarkTheme(prev => !prev);
