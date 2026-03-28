@@ -13,20 +13,13 @@ export default function App() {
   return (
     <HistoryProvider>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="Home">
-
-          {/* 🟢 Entry Screen */}
-          <Stack.Screen 
-            name="Home" 
-            component={HomeScreen} 
-            options={{ headerShown: false }}
-          />
+        <Stack.Navigator initialRouteName="Translator">
 
           {/* 🟢 Main App */}
           <Stack.Screen 
             name="Translator" 
             component={TranslatorScreen}
-            options={{ title: "Multimodal Language Translator" }}
+             options={{ headerShown: false }}
           />
 
           {/* 🟢 Research / Analysis */}

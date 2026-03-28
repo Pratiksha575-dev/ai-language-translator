@@ -1,121 +1,226 @@
-// 🔥 ONLY IMPORTANT CHANGES DONE — CLEAN VERSION
-
 import 'react-native-gesture-handler';
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext } from 'react';
 import { Audio } from "expo-av";
 import axios from 'axios';
 import * as Speech from "expo-speech";
 import {
-  View, Text, TextInput, FlatList, TouchableOpacity,
-  StyleSheet, SafeAreaView, KeyboardAvoidingView,
-  Platform, TouchableWithoutFeedback, Keyboard,
-  ActivityIndicator, Image
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ActivityIndicator,
 } from 'react-native';
-
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { HistoryContext } from './HistoryContext';
-import { translateParallel } from './services/translationOrchestrator';
+import { HistoryContext } from './HistoryContext'; // import context
+import {translateParallel } from './services/translationOrchestrator';
 import * as ImagePicker from "expo-image-picker";
+import { Image } from "react-native";
 
-export default function TranslatorScreen({ navigation }) {
 
-  const { addHistory } = useContext(HistoryContext);
+export default function TranslatorScreen({  navigation,route}) {
+  const { addHistory } = useContext(HistoryContext); // get function from context
 
   const [text, setText] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [compareMode, setCompareMode] = useState(false);
-
   const [sourceLang, setSourceLang] = useState('en');
   const [targetLang, setTargetLang] = useState('hi');
-
+  const [compareMode, setCompareMode] = useState(false);
+  const [openSource, setOpenSource] = useState(false);
+  const [openTarget, setOpenTarget] = useState(false);
   const [pendingImage, setPendingImage] = useState(null);
   const [showImageOptions, setShowImageOptions] = useState(false);
-
-  const flatListRef = useRef();
-
+ //need to change this to indian langauges.
   const languages = [
-    { label: 'English', value: 'en' },
-    { label: 'Hindi', value: 'hi' },
-    { label: 'Marathi', value: 'mr' },
-    { label: 'Tamil', value: 'ta' },
-    { label: 'Telugu', value: 'te' },
-  ];
+  { label: 'English', value: 'en' },  
+  { label: 'Hindi', value: 'hi' },
+  { label: 'Marathi', value: 'mr' },
+  { label: 'Tamil', value: 'ta' },
+  { label: 'Telugu', value: 'te' },
+  { label: 'Bengali', value: 'bn' },
+  { label: 'Urdu', value: 'ur' },
+];
 
-  const speechLangMap = {
-    en: "en-US", hi: "hi-IN", mr: "mr-IN", ta: "ta-IN", te: "te-IN"
-  };
+const speechLangMap={
+  en:"en-US",
+  hi:"hi-IN",
+  mr:"mr-IN",
+  ta:"ta-IN",
+  te:"te-IN"
+}
 
-  /* 🔥 TEXT TRANSLATION */
-  const sendMessage = async (inputText = text) => {
-    if (!inputText || loading) return;
+/*-------TEXT TRANSLATION LOGIC   ------*/
+const sendMessage = async (inputText = text,options={}) => {
+  if (!inputText) return;
 
-    setMessages(prev => [...prev, { type: "user", text: inputText }]);
+  if (!options.silent) {
+  const userMessage = { type: "user", text: inputText };
+  setMessages(prev => [...prev, userMessage]);
+}
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      let results = [];
+    let results = [];
 
-      if (compareMode) {
-        results = await translateParallel(inputText, sourceLang, targetLang);
-      } else {
-        const res = await axios.post(
-          "https://multi-modal-langauge-translator.onrender.com/translate/google",
-          { text: inputText, sourceLang, targetLang }
-        );
+    if (compareMode) {
+      results = await translateParallel(
+        inputText,
+        sourceLang,
+        targetLang
+      );
+    } else {
+      const start = Date.now();
 
-        results = [{
-          name: "Result",
+      const res = await axios.post(
+        "https://multi-modal-language-translator.onrender.com/translate/google",
+        {
+          text: inputText,
+          sourceLang,
+          targetLang
+        }
+      );
+
+      const end = Date.now();
+
+      results = [
+        {
+          name: "Google",
           text: res.data.translation,
-          time: 0,
+          time: end - start,
           success: true
-        }];
-      }
+        }
+      ];
+    }
 
+    console.log("RAW RESULTS:", results);
+
+    // ✅ FIXED FILTER (NO success dependency)
+    const cleanedResults = results
+      .filter(r => r && r.text && r.name)
+      .map(r => ({
+        name: r.name,
+        text: r.text,
+        time: r.time || 0,
+        success: true
+      }));
+
+    console.log("CLEANED RESULTS:", cleanedResults);
+
+    if (cleanedResults.length > 0) {
       setMessages(prev => [
         ...prev,
-        { type: "translated", results, selectedIndex: 0 }
+        {
+          type: "translated",
+          results: cleanedResults,
+          selectedIndex: 0
+        }
       ]);
 
-      addHistory({
-        id: Date.now(),
-        inputText,
-        results,
-        sourceLang,
-        targetLang,
-        compareMode
-      });
+      // ✅ STORE ONLY RESEARCH MODE
+      if (compareMode) {
+        addHistory({
+          id: Date.now(),
+          mode: "research", // 🔥 CRITICAL
+          inputText,
+          results: cleanedResults,
+          sourceLang,
+          targetLang,
+          timestamp: Date.now()
+        });
 
-    } catch (err) {
-      console.log("ERROR:", err.message);
-    } finally {
-      setLoading(false);
-      setText("");
+        console.log("Saved to history");
+      }
+
+    } else {
+      setMessages(prev => [
+        ...prev,
+        {
+          type: "translated",
+          results: [],
+          selectedIndex: 0
+        }
+      ]);
     }
-  };
 
-  /* 🔥 IMAGE PICK */
-  const pickImage = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images
+  } catch (error) {
+    console.log(
+      "FULL ERROR:",
+      error.response?.data || error.message
+    );
+
+    setMessages(prev => [
+      ...prev,
+      {
+        type: "translated",
+        results: [],
+        selectedIndex: 0,
+        error: true
+      }
+    ]);
+  } finally {
+    setLoading(false);
+    setText("");
+  }
+};
+/*-------Image Translation -----*/
+const pickImageAndTranslate = async () => {
+  try {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      alert("Permission required");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.6,
     });
 
-    if (res.canceled) return;
+    if (result.canceled) return;
 
-    const img = res.assets[0];
+    const image = result.assets[0];
 
-    setMessages(prev => [...prev, { type: "image", uri: img.uri }]);
-    setPendingImage(img);
+    // ✅ show image instantly
+    setMessages(prev => [
+      ...prev,
+      { type: "image", uri: image.uri }
+    ]);
+
+    // ✅ store image + show options
+    setPendingImage(image);
     setShowImageOptions(true);
+
+  } catch (err) {
+    console.log("IMAGE PICK ERROR:", err);
+  }
+};
+/*----------TAB SWITCH--------*/
+  const changeTab = (msgIndex, tabIndex) => {
+    setMessages(prev => {
+       const updated = [...prev];
+      updated[msgIndex].selectedIndex = tabIndex;
+      return updated;
+    });
   };
 
-  /* 🔥 IMAGE ACTION */
-  const handleImageAction = async (mode) => {
+  const handleImageAction = async (modeType) => {
+  try {
     setShowImageOptions(false);
+    setLoading(true);
 
     const formData = new FormData();
+    if (!pendingImage) return;
+
     formData.append("image", {
       uri: pendingImage.uri,
       type: "image/jpeg",
@@ -123,160 +228,508 @@ export default function TranslatorScreen({ navigation }) {
     });
 
     formData.append("targetLang", targetLang);
-    formData.append("mode", mode);
+    formData.append("mode", modeType); // 🔥 IMPORTANT
 
+    const res = await fetch(
+      "https://multi-modal-language-translator.onrender.com/image-translate-gemini",
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+    const text = await res.text();
+
+    let data;
     try {
-      setLoading(true);
+      data = JSON.parse(text);
+    } catch {
+      console.log("Invalid response:", text);
+      throw new Error("Server error");
+    }
 
-      const res = await fetch(
-        "https://multi-modal-langauge-translator.onrender.com/image-process",
-        { method: "POST", body: formData }
+    setMessages(prev => [
+      ...prev,
+      {
+        type: "translated",
+        results: [
+          {
+            name: modeType === "explain" ? "Image Explanation" : "Image Translation",
+            text: data.translation || "No content detected",
+            time: 0,
+            success: true
+          }
+        ],
+        selectedIndex: 0
+      }
+    ]);
+
+  } catch (err) {
+    console.log("IMAGE ACTION ERROR:", err.message);
+  } finally {
+    setLoading(false);
+    setPendingImage(null);
+  }
+};
+/*----------AUDIO RECORDING-------*/
+const [recording, setRecording] = useState(null);
+const startRecording = async () => {
+    try {
+      await Audio.requestPermissionsAsync();
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
       );
 
-      const data = await res.json();
-
-      setMessages(prev => [
-        ...prev,
-        {
-          type: "translated",
-          results: [{ name: mode, text: data.result }],
-          selectedIndex: 0
-        }
-      ]);
+      setRecording(recording);
 
     } catch (err) {
-      console.log("IMAGE ERROR:", err);
-    } finally {
-      setLoading(false);
-      setPendingImage(null);
+      console.log("Recording error:", err);
     }
   };
 
-  const speakText = (text, lang) => {
-    Speech.speak(text, { language: speechLangMap[lang] });
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      await sendAudioToBackend(uri);
+
+    } catch (err) {
+      console.log("Stop recording error:", err);
+    }
   };
 
-  /* 🔥 RENDER ITEM (for smooth scroll) */
-  const renderItem = ({ item, index }) => {
+  const sendAudioToBackend = async (uri) => {
+    try {
+      const formData = new FormData();
 
-    if (item.type === "image") {
-      return <Image source={{ uri: item.uri }} style={{ width: 200, height: 200, alignSelf: "flex-end", margin: 10 }} />;
-    }
+      formData.append("audio", {
+        uri,
+        name: "recording.wav",
+        type: "audio/wav",
+      });
 
-    if (item.type === "user") {
-      return <View style={[styles.userBubble]}><Text style={{ color: "white" }}>{item.text}</Text></View>;
-    }
-
-    if (item.type === "translated") {
-      return (
-        <View style={styles.translatedBubble}>
-          <Text>{item.results[0].text}</Text>
-          <TouchableOpacity onPress={() => speakText(item.results[0].text, targetLang)}>
-            <Ionicons name="volume-high-outline" size={20} />
-          </TouchableOpacity>
-        </View>
+      const response = await axios.post(
+        "https://multi-modal-language-translator.onrender.com/transcribe",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
-    }
 
-    return null;
+      const transcribedText = response.data.text;
+
+      await sendMessage(transcribedText);
+
+    } catch (error) {
+      console.log("AUDIO ERROR:", error.response?.data || error.message);
+    }
   };
 
+  const speakText = (text,lang) => {
+  Speech.speak(text, {
+    language: speechLangMap[lang],
+    pitch: 1,
+    rate: 0.9
+  });
+};
+
+  /*-------- UI LOGIC --------*/
   return (
-    <SafeAreaView style={styles.container}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <SafeAreaView style={styles.container}>
 
-      {/* 🔥 TOP BAR */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>Multimodal Translator</Text>
+        {/* Top Bar */}
+        <View style={styles.topBar}>
 
-        <TouchableOpacity onPress={() => setCompareMode(!compareMode)}>
-          <Text style={{ color: "white" }}>
-            {compareMode ? "Compare ON" : "Compare OFF"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate("Analytics")}>
-        <Ionicons name="analytics-outline" size={26} color="white" />
-      </TouchableOpacity>
-      </View>
+            {/* 📊 Analytics */}
+            <TouchableOpacity 
+              onPress={() => navigation.navigate("Analytics")}
+              style={{ marginRight: 10 }}
+            >
+              <Ionicons name="stats-chart" size={26} color="#00FFAA" />
+            </TouchableOpacity>
 
-      {/* 🔥 CHAT (FIXED SMOOTH SCROLL) */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={(_, i) => i.toString()}
-        onContentSizeChange={() => flatListRef.current.scrollToEnd({ animated: true })}
-      />
+            {/* Title + Compare */}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Multimodal Language Translator</Text>
 
-      {/* 🔥 IMAGE OPTIONS */}
-      {showImageOptions && (
-        <View style={{ flexDirection: "row", justifyContent: "center" }}>
-          <TouchableOpacity onPress={() => handleImageAction("translate")}>
-            <Text style={{ color: "white" }}>Translate</Text>
+              <TouchableOpacity onPress={() => setCompareMode(!compareMode)}>
+                <Text style={{ color: "#00FFAA", fontSize: 12 }}>
+                  {compareMode ? "Compare ON" : "Compare OFF"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Right icons */}
+            <View style={{ flexDirection: "row" }}>
+              <Ionicons name="time-outline" size={24} color="white" style={{ marginRight: 10 }} />
+              <Ionicons name="settings-outline" size={24} color="white" style={{ marginRight: 10 }} />
+              <Ionicons name="person-circle-outline" size={26} color="white" />
+            </View>
+
+          </View>
+      
+        {/* Language Pickers with Swap Button */}
+        <View style={[styles.dropdownContainer, { alignItems: 'center' }]}>
+          <DropDownPicker
+            open={openSource}
+            value={sourceLang}
+            items={languages}
+            setOpen={setOpenSource}
+            setValue={setSourceLang}
+            placeholder="From"
+            containerStyle={{ flex: 1, marginRight: 5 }}
+            style={styles.dropdown}
+            dropDownContainerStyle={styles.dropdownContainerStyle}
+            zIndex={5000}
+            labelStyle={{ color: 'white' }}
+            selectedItemLabelStyle={{ color: 'white', fontWeight: 'bold' }}
+            listItemLabelStyle={{ color: 'white' }}
+            arrowIconStyle={{ tintColor: 'white' }}
+            tickIconStyle={{ tintColor: 'white' }}
+          />
+
+          {/* Swap Button */}
+          <TouchableOpacity
+            onPress={() => {
+              const temp = sourceLang;
+              setSourceLang(targetLang);
+              setTargetLang(temp);
+            }}
+            style={styles.swapBtn}
+          >
+            <MaterialIcons name="swap-horiz" size={28} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleImageAction("explain")}>
-            <Text style={{ color: "white" }}>Explain</Text>
-          </TouchableOpacity>
+
+          <DropDownPicker
+            open={openTarget}
+            value={targetLang}
+            items={languages}
+            setOpen={setOpenTarget}
+            setValue={setTargetLang}
+            placeholder="To"
+            containerStyle={{ flex: 1, marginLeft: 5 }}
+            style={styles.dropdown}
+            dropDownContainerStyle={styles.dropdownContainerStyle}
+            zIndex={4000}
+            labelStyle={{ color: 'white' }}
+            selectedItemLabelStyle={{ color: 'white', fontWeight: 'bold' }}
+            listItemLabelStyle={{ color: 'white' }}
+            arrowIconStyle={{ tintColor: 'white' }}
+            tickIconStyle={{ tintColor: 'white' }}
+          />
         </View>
-      )}
 
-      {/* 🔥 INPUT */}
-      <View style={styles.inputArea}>
-        <TouchableOpacity onPress={pickImage}>
-          <Ionicons name="image-outline" size={24} color="white" />
-        </TouchableOpacity>
+        {/* Chat Area */}
+        <ScrollView
+          style={styles.chatArea}
+          contentContainerStyle={{ padding: 10, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {messages.map((msg, index) => {
+            if (msg.type === "image") {
+                return (
+                  <View key={index} style={{ marginBottom: 10 }}>
+                    <Image
+                      source={{ uri: msg.uri }}
+                      style={{
+                        width: 220,
+                        height: 220,
+                        borderRadius: 10,
+                        alignSelf: "flex-end"
+                      }}
+                    />
+                  </View>
+                );
+              }
+            
+            if (msg.type === "user") {
+              return (
+                <View key={index} style={[styles.messageBubble, styles.userBubble]}>
+                  <Text style={{ color: "white" }}>{msg.text}</Text>
+                </View>
+              );
+            }
 
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-        />
+            if (msg.type === "translated") {
+              return (
+                <View key={index} style={[styles.messageBubble, styles.translatedBubble]}>
 
-        <TouchableOpacity onPress={() => sendMessage()}>
-          <MaterialIcons name="send" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+                  {msg.results.length > 0 ? (
+                    <>
+                      <View style={styles.tabRow}>
+                        {msg.results.map((res, i) => (
+                          <TouchableOpacity
+                            key={i}
+                            onPress={() => changeTab(index, i)}
+                            style={[
+                              styles.tabButton,
+                              msg.selectedIndex === i && styles.activeTab
+                            ]}
+                          >
+                            <Text style={{ fontSize: 12 }}>
+                              {res.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
 
-    </SafeAreaView>
+                      <View style={{ marginTop: 6 }}>
+                          <Text style={{ flexWrap: "wrap" }}>
+                            {msg.results[msg.selectedIndex].text}
+                          </Text>
+
+                          <TouchableOpacity
+                            onPress={() =>
+                              speakText(
+                                msg.results[msg.selectedIndex].text,
+                                targetLang
+                              )
+                            }
+                            style={{ marginTop: 6 }}
+                          >
+                            <Ionicons name="volume-high-outline" size={20} color="#333" />
+                          </TouchableOpacity>
+
+                        </View>
+                      <Text style={{ fontSize: 10, marginTop: 4 }}>
+                        {msg.results[msg.selectedIndex].time} ms
+                      </Text>
+                    </>
+                  ) : (
+                    <Text>No API responded successfully.</Text>
+                  )}
+
+                </View>
+              );
+            }
+
+            return null;
+          })}
+
+          {loading && (
+            <ActivityIndicator size="small" color="#007AFF" style={{ marginTop: 10}} />
+          )}
+        </ScrollView>
+        {showImageOptions && (
+              <View style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                justifyContent: "flex-end"
+              }}>
+                <View style={{
+                  backgroundColor: "#1f1f1f",
+                  margin: 20,
+                  padding: 15,
+                  borderRadius: 10
+                }}>
+
+                  <Text style={{ color: "white", marginBottom: 10 }}>
+                    What do you want to do with this image?
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() => handleImageAction("translate")}
+                    style={{
+                      backgroundColor: "#007AFF",
+                      padding: 10,
+                      borderRadius: 8,
+                      marginBottom: 8
+                    }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center" }}>
+                      Translate Text
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleImageAction("explain")}
+                    style={{
+                      backgroundColor: "#00AA88",
+                      padding: 10,
+                      borderRadius: 8
+                    }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center" }}>
+                      Explain Image
+                    </Text>
+                  </TouchableOpacity>
+
+                </View>
+              </View>
+            )}
+        {/* Bottom Input Area */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.inputWrapper}
+        >
+        <View style={styles.inputArea}>
+
+              {/* MIC BUTTON */}
+              <TouchableOpacity 
+                onPress={recording ? stopRecording : startRecording} 
+                style={styles.micBtn}
+              >
+                <Ionicons
+                  name={recording ? "stop-circle" : "mic-outline"}
+                  size={24}
+                  color="white"
+                />
+              </TouchableOpacity>
+
+          
+                <TouchableOpacity 
+                  onPress={pickImageAndTranslate} 
+                  style={styles.imageBtn}
+                >
+                  <Ionicons name="image-outline" size={24} color="white" />
+                </TouchableOpacity>
+
+              {/* TEXT INPUT */}
+              <TextInput
+                style={styles.input}
+                placeholder="Type a message"
+                placeholderTextColor="#888"
+                value={text}
+                onChangeText={setText}
+              />
+
+              {/* SEND BUTTON */}
+              <TouchableOpacity 
+                onPress={() => sendMessage(text)} 
+                style={styles.sendBtn}
+              >
+                <MaterialIcons name="send" size={24} color="white" />
+              </TouchableOpacity>
+
+            </View>
+          
+        </KeyboardAvoidingView>
+
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 
-/* 🔥 STYLES */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
 
   topBar: {
+    height: 80,
+    backgroundColor: '#1f1f1f',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 15,
-    backgroundColor: '#1f1f1f'
+    padding:12
   },
 
-  title: { color: "white", fontWeight: "bold" },
+  title: { fontSize: 18, fontWeight: 'bold', color: 'white' },
+
+  dropdownContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    marginTop: 10,
+    zIndex: 1000,
+  },
+
+  dropdown: { backgroundColor: '#1f1f1f', borderColor: '#333' },
+  dropdownContainerStyle: { backgroundColor: '#1f1f1f' },
+
+  swapBtn: {
+    padding: 5,
+    marginHorizontal: 5,
+    backgroundColor: '#333',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  chatArea: { flex: 1 },
+
+  messageBubble: {
+    maxWidth: '85%',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
 
   userBubble: {
     backgroundColor: '#007AFF',
-    padding: 10,
-    margin: 10,
     alignSelf: 'flex-end',
-    borderRadius: 10
   },
 
   translatedBubble: {
     backgroundColor: '#e0e0e0',
-    padding: 10,
-    margin: 10,
-    borderRadius: 10
+    alignSelf: 'flex-start',
   },
 
+  tabRow: {
+  flexDirection: "row",
+  marginBottom: 5,
+},
+
+tabButton: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  backgroundColor: "#ccc",
+  borderRadius: 10,
+  marginRight: 5,
+},
+
+  inputWrapper: { paddingBottom: 20 },
+
+   activeTab: {
+    backgroundColor: "#007AFF",
+  },
+  
   inputArea: {
     flexDirection: 'row',
-    padding: 10,
-    backgroundColor: '#1f1f1f'
+    paddingHorizontal: 10,
+    backgroundColor: '#1f1f1f',
+    alignItems: 'center',
+    marginBottom: 10,
   },
+
+  micBtn: {
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+    padding: 10,
+    marginRight: 10,
+  },
+
+  imageBtn: {
+  backgroundColor: '#444',
+  borderRadius: 25,
+  padding: 10,
+  marginRight: 10,
+},
 
   input: {
     flex: 1,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    height: 45,
+    marginRight: 10,
     color: 'white',
-    marginHorizontal: 10
-  }
+  },
+
+  sendBtn: {
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+    padding: 10,
+  },
 });
