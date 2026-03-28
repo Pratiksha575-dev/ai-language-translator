@@ -7,6 +7,16 @@ import fs from "fs";
 import { transcribeAudio } from "./groqWhisper.js";
 import Tesseract from "tesseract.js";
 
+import path from "path";
+
+const __dirname = new URL('.', import.meta.url).pathname;
+const uploadDir = path.join(__dirname, "uploads");
+
+// ✅ ALWAYS CREATE FOLDER SAFELY
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 dotenv.config();
 
 const app = express();
@@ -15,7 +25,7 @@ app.use(express.json());
 
 /* ---------------- MULTER (ONLY ONCE) ---------------- */
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
+  destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now();
     const ext = file.originalname.split(".").pop();
@@ -170,17 +180,25 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
 
 app.post("/image-translate-gemini", upload.single("image"), async (req, res) => {
   try {
+    console.log("📸 Image received");
+
     if (!req.file) {
       return res.status(400).json({ error: "No image uploaded" });
     }
 
     const imagePath = req.file.path;
 
-    const imageBase64 = fs.readFileSync(imagePath, { encoding: "base64" });
+    console.log("Saved at:", imagePath);
+
+    const imageBase64 = fs.readFileSync(imagePath, {
+      encoding: "base64"
+    });
 
     fs.unlinkSync(imagePath); // cleanup
 
     const { targetLang } = req.body;
+
+    console.log("TargetLang:", targetLang);
 
     const langNames = {
       en: "English",
@@ -191,13 +209,8 @@ app.post("/image-translate-gemini", upload.single("image"), async (req, res) => 
     };
 
     const prompt = `
-Translate ONLY the meaningful and important content from this image into ${langNames[targetLang]}.
-
-Rules:
-- Ignore decorative or repeated text
-- Ignore design elements
-- Keep output clean and natural
-- Do not explain anything
+Translate ONLY meaningful and important content into ${langNames[targetLang]}.
+Ignore decorations, repeated text, and noise.
 `;
 
     const response = await axios.post(
@@ -219,16 +232,33 @@ Rules:
       }
     );
 
+    console.log("Gemini response received");
+
     const output =
-  response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "No text detected";
-  if (!output) {
-  return res.json({ translation: "No meaningful text found" });
-}
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!output) {
+      return res.json({ translation: "No meaningful text found" });
+    }
+
     res.json({ translation: output });
 
   } catch (error) {
-    console.log("GEMINI ERROR:", error.response?.data || error.message);
-    res.status(500).json({ error: "Gemini image translation failed" });
+    console.log("🔥 GEMINI FULL ERROR:");
+
+    if (error.response) {
+      console.log(JSON.stringify(error.response.data, null, 2));
+      return res.status(500).json({
+        error: "Gemini failed",
+        details: error.response.data
+      });
+    } else {
+      console.log(error.message);
+      return res.status(500).json({
+        error: "Server crash",
+        details: error.message
+      });
+    }
   }
 });
 
