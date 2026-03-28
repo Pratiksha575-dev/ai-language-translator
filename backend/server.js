@@ -197,7 +197,7 @@ app.post("/image-process", upload.single("image"), async (req, res) => {
 
     fs.unlinkSync(imagePath); // cleanup
 
-    const { targetLang } = req.body;
+    const { targetLang ,mode} = req.body;
 
     console.log("TargetLang:", targetLang);
 
@@ -215,7 +215,7 @@ if (mode === "translate") {
   prompt = `
   Extract important readable text from image.
   Ignore noise.
-  Translate to ${targetLang}.
+  Translate to ${langNames[targetLang]}.
   Return only clean translated text.
   `;
 }
@@ -229,7 +229,7 @@ if (mode === "explain") {
   - List main components
   - Explain flow simply
 
-  Respond in ${targetLang}.
+  Respond in ${langNames[targetLang]}.
   Do NOT output raw extracted text.
   `;
 }

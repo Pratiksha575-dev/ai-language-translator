@@ -81,7 +81,7 @@ const sendMessage = async (inputText = text,options={}) => {
       const start = Date.now();
 
       const res = await axios.post(
-        "https://multi-modal-language-translator.onrender.com/translate/google",
+        "https://multi-modal-langauge-translator.onrender.com/translate/google",
         {
           text: inputText,
           sourceLang,
@@ -231,7 +231,7 @@ const pickImageAndTranslate = async () => {
     formData.append("mode", modeType); // 🔥 IMPORTANT
 
     const res = await fetch(
-      "https://multi-modal-language-translator.onrender.com/image-translate-gemini",
+      "https://multi-modal-langauge-translator.onrender.com/image-process",
       {
         method: "POST",
         body: formData
@@ -318,7 +318,7 @@ const startRecording = async () => {
       });
 
       const response = await axios.post(
-        "https://multi-modal-language-translator.onrender.com/transcribe",
+        "https://multi-modal-langauge-translator.onrender.com/transcribe",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
