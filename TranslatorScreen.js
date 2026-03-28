@@ -181,7 +181,7 @@ const pickImageAndTranslate = async () => {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
+      quality: 0.6,
     });
 
     if (result.canceled) return;

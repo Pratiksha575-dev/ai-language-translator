@@ -209,8 +209,20 @@ app.post("/image-translate-gemini", upload.single("image"), async (req, res) => 
     };
 
     const prompt = `
-Translate ONLY meaningful and important content into ${langNames[targetLang]}.
-Ignore decorations, repeated text, and noise.
+You are an AI that extracts and translates text from images.
+
+Step 1: Identify ALL visible text in the image.
+Step 2: Keep only meaningful text (headings, labels, important info).
+Step 3: Ignore decorative, repeated, or background text.
+
+Step 4: Translate the cleaned text into ${langNames[targetLang]}.
+
+IMPORTANT:
+- Preserve structure (line breaks, bullet points)
+- Do NOT explain anything
+- Output ONLY the translated text
+
+If no useful text exists, say: "No meaningful text found"
 `;
 
     const response = await axios.post(
