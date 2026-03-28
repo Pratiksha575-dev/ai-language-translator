@@ -2,7 +2,7 @@ import axios from "axios";
 
 export const translateGroq = async (text, sourceLang, targetLang) => {
   const response = await axios.post(
-    "http://192.168.1.201:5000/translate/groq",
+    "https://multi-modal-langauge-translator.onrender.com/translate/groq",
     { text, sourceLang, targetLang }
   );
 

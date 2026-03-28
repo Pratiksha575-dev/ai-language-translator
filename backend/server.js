@@ -178,8 +178,9 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
   }
 });
 
-app.post("/image-translate-gemini", upload.single("image"), async (req, res) => {
+app.post("/image-process", upload.single("image"), async (req, res) => {
   try {
+    
     console.log("📸 Image received");
 
     if (!req.file) {
@@ -208,23 +209,30 @@ app.post("/image-translate-gemini", upload.single("image"), async (req, res) => 
       te: "Telugu"
     };
 
-    const prompt = `
-You are an AI that extracts and translates text from images.
+  let prompt = "";
 
-Step 1: Identify ALL visible text in the image.
-Step 2: Keep only meaningful text (headings, labels, important info).
-Step 3: Ignore decorative, repeated, or background text.
+if (mode === "translate") {
+  prompt = `
+  Extract important readable text from image.
+  Ignore noise.
+  Translate to ${targetLang}.
+  Return only clean translated text.
+  `;
+}
 
-Step 4: Translate the cleaned text into ${langNames[targetLang]}.
+if (mode === "explain") {
+  prompt = `
+  Analyze this image.
 
-IMPORTANT:
-- Preserve structure (line breaks, bullet points)
-- Do NOT explain anything
-- Output ONLY the translated text
+  If it is a diagram, chart, or architecture:
+  - Explain what it represents
+  - List main components
+  - Explain flow simply
 
-If no useful text exists, say: "No meaningful text found"
-`;
-
+  Respond in ${targetLang}.
+  Do NOT output raw extracted text.
+  `;
+}
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
