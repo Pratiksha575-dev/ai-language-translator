@@ -228,6 +228,7 @@ if (mode === "explain") {
   - Explain what it represents
   - List main components
   - Explain flow simply
+  - keep explanation concise
 
   Respond in ${langNames[targetLang]}.
   Do NOT output raw extracted text.
