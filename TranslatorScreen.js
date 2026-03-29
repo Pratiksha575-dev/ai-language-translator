@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext,useRef } from 'react';
 import { Audio } from "expo-av";
 import axios from 'axios';
 import * as Speech from "expo-speech";
@@ -48,7 +48,7 @@ export default function TranslatorScreen({  navigation,route}) {
   { label: 'Bengali', value: 'bn' },
   { label: 'Urdu', value: 'ur' },
 ];
-
+const scrollRef=useRef();
 const speechLangMap={
   en:"en-US",
   hi:"hi-IN",
@@ -126,19 +126,18 @@ const sendMessage = async (inputText = text,options={}) => {
       ]);
 
       // ✅ STORE ONLY RESEARCH MODE
-      if (compareMode) {
+     
         addHistory({
           id: Date.now(),
-          mode: "research", // 🔥 CRITICAL
           inputText,
           results: cleanedResults,
           sourceLang,
           targetLang,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          inputType: options.inputType || "text",
+          compareMode: compareMode
         });
-
         console.log("Saved to history");
-      }
 
     } else {
       setMessages(prev => [
@@ -263,6 +262,24 @@ const pickImageAndTranslate = async () => {
         selectedIndex: 0
       }
     ]);
+    addHistory({
+  id: Date.now(),
+  inputText: "Image Input",
+  results: [
+    {
+      name: modeType === "explain" ? "Image Explanation" : "Image Translation",
+      text: data.translation || "No content detected",
+      time: 0,
+      success: true
+    }
+  ],
+  sourceLang,
+  targetLang,
+  timestamp: Date.now(),
+  inputType: "image",
+  imageMode: modeType, // 🔥 KEY
+  compareMode: false
+});
 
   } catch (err) {
     console.log("IMAGE ACTION ERROR:", err.message);
@@ -325,7 +342,10 @@ const startRecording = async () => {
 
       const transcribedText = response.data.text;
 
-      await sendMessage(transcribedText);
+      await sendMessage(transcribedText, {
+        inputType: "audio"
+      });
+      
 
     } catch (error) {
       console.log("AUDIO ERROR:", error.response?.data || error.message);
@@ -376,7 +396,7 @@ const startRecording = async () => {
               <Ionicons name="settings-outline" size={24} color="white" style={{ marginRight: 10 }} />
               </TouchableOpacity>
               <TouchableOpacity 
-              placeholder={() => alert("Profile feature coming soon!")} 
+              onPress={() => alert("Profile feature coming soon!")} 
               style={{ marginRight: 10 }}
             >
               <Ionicons name="person-circle-outline" size={26} color="white" />
@@ -442,6 +462,8 @@ const startRecording = async () => {
           contentContainerStyle={{ padding: 10, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          ref={scrollRef}
+          onContentSizeChange={() => scrollRef.current.scrollToEnd({ animated: true })}
         >
           {messages.map((msg, index) => {
             if (msg.type === "image") {

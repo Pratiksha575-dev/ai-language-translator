@@ -1,189 +1,198 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity
+  ScrollView
 } from "react-native";
 import { HistoryContext } from "./HistoryContext";
-import { sentenceBleu } from "bleu-score";
 
 export default function AnalyticsScreen() {
   const { history } = useContext(HistoryContext);
 
-  const [selectedLang, setSelectedLang] = useState("all");
-  const [timeFilter, setTimeFilter] = useState("all");
 
-  /* BLEU */
-  const calculateBleu = (ref, cand) => {
-    try {
-      if (!ref || !cand) return 0;
-      return sentenceBleu([ref.split(" ")], cand.split(" "));
-    } catch {
-      return 0;
-    }
-  };
+  /* ALL DATA */
+  const data = useMemo(() => {
+    return Array.isArray(history) ? history : [];
+  }, [history]);
 
-  /* FILTER ONLY RESEARCH */
-  const filteredData = useMemo(() => {
-    let data = Array.isArray(history)
-      ? history.filter(h => h?.mode === "research")
-      : [];
+  if (data.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>
+          No analytics yet
+        </Text>
+      </View>
+    );
+  }
 
-    if (selectedLang !== "all") {
-      data = data.filter(h => h?.targetLang === selectedLang);
-    }
-
-    const now = Date.now();
-
-    if (timeFilter === "7d") {
-      data = data.filter(
-        h => h?.timestamp && now - h.timestamp < 7 * 24 * 60 * 60 * 1000
-      );
-    }
-
-    console.log("FILTERED DATA:", data);
-    return data;
-  }, [history, selectedLang, timeFilter]);
-
-  /* STATS */
+  /* ================= API STATS ================= */
   const apiStats = {};
 
-  filteredData.forEach(item => {
+  data.forEach(item => {
     if (!item?.results) return;
 
     const google = item.results.find(r => r.name === "Google");
 
     item.results.forEach(r => {
       if (!r?.name) return;
+      
+      if (
+        r.name =="Image Translation" || 
+        r.name =="Image Explanation" ||
+        r.name =="Result"
+      ) return;
+
 
       if (!apiStats[r.name]) {
         apiStats[r.name] = {
           totalTime: 0,
-          count: 0,
-          bleuTotal: 0
+          count: 0
         };
       }
 
       apiStats[r.name].totalTime += r.time || 0;
       apiStats[r.name].count += 1;
 
-      if (google && r.name !== "Google") {
-        apiStats[r.name].bleuTotal += calculateBleu(
-          google.text,
-          r.text
-        );
-      }
     });
   });
 
-  /* METRICS */
-  const metrics = Object.keys(apiStats).map(api => {
+  const metrics = Object.keys(apiStats)
+  .filter(api =>
+    api !== "Image Translation" &&
+    api !== "Image Explanation" &&
+    api !== "Result"
+  )
+  .map(api => {
     const count = apiStats[api].count;
 
     return {
       api,
-      avgTime: count ? apiStats[api].totalTime / count : 0,
-      avgBleu:
-        api === "Google"
-          ? 1
-          : count
-          ? apiStats[api].bleuTotal / count
-          : 0
+      avgTime: count ? apiStats[api].totalTime / count : 0
     };
   });
 
-  if (metrics.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.emptyText}>
-          No research analytics yet
-        </Text>
-      </View>
-    );
-  }
+  /* ================= INPUT TYPE ================= */
+  const inputStats = { text: 0, audio: 0, image: 0 };
 
-  /* KPI */
-  const bestAPI = metrics.reduce((a, b) =>
-    a.avgTime < b.avgTime ? a : b
-  );
+  data.forEach(item => {
+    if (item.inputType) {
+      inputStats[item.inputType]++;
+    }
+  });
 
-  const bestAccuracy = metrics.reduce((a, b) =>
-    a.avgBleu > b.avgBleu ? a : b
-  );
+  /* ================= IMAGE MODE ================= */
+  const imageStats = { translate: 0, explain: 0 };
+
+  data.forEach(item => {
+    if (item.inputType === "image" && item.imageMode) {
+      imageStats[item.imageMode]++;
+    }
+  });
+
+  /* ================= COMPARE MODE ================= */
+  let compareCount = 0;
+  data.forEach(item => {
+    if (item.compareMode) compareCount++;
+  });
+
+  /* ================= BEST API ================= */
+ const bestAPI = metrics.length
+  ? metrics.reduce((a, b) => (a.avgTime < b.avgTime ? a : b))
+  : { api: "-" };
+
+  /* ================= TOTAL INPUT ================= */
+  const totalInputs =
+    inputStats.text + inputStats.audio + inputStats.image;
 
   return (
     <ScrollView style={styles.container}>
-
-      {/* FILTERS */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity onPress={() => setSelectedLang("all")}>
-          <Text style={styles.filter}>All</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setSelectedLang("hi")}>
-          <Text style={styles.filter}>Hindi</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setTimeFilter("7d")}>
-          <Text style={styles.filter}>Last 7 Days</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* KPI */}
       <View style={styles.kpiRow}>
         <View style={styles.kpiCard}>
           <Text style={styles.kpiText}>Total</Text>
-          <Text style={styles.kpiValue}>
-            {filteredData.length}
-          </Text>
+          <Text style={styles.kpiValue}>{data.length}</Text>
         </View>
 
         <View style={styles.kpiCard}>
-          <Text style={styles.kpiText}>Fastest</Text>
-          <Text style={styles.kpiValue}>
-            {bestAPI.api}
-          </Text>
+          <Text style={styles.kpiText}>Fastest API</Text>
+          <Text style={styles.kpiValue}>{bestAPI.api}</Text>
         </View>
 
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiText}>Best BLEU</Text>
-          <Text style={styles.kpiValue}>
-            {bestAccuracy.api}
-          </Text>
-        </View>
       </View>
 
-      {/* BAR VISUAL */}
-      <Text style={styles.title}>Avg Response Time</Text>
+      {/* API PERFORMANCE */}
+      <Text style={styles.title}>API Performance</Text>
 
       {metrics.map((m, i) => (
         <View key={i} style={{ marginBottom: 12 }}>
           <Text style={{ color: "white" }}>
-            {m.api} ({Math.round(m.avgTime)} ms)
+            {m.api} ({Math.round(m.avgTime)} ms )
           </Text>
 
-          <View
-            style={{
-              height: 10,
-              width: Math.min(m.avgTime * 2, 300),
-              backgroundColor: "#36A2EB",
-              borderRadius: 5,
-              marginTop: 4
-            }}
-          />
+          <View style={styles.barBg}>
+            <View
+              style={{
+                height: "100%",
+                width: `${Math.min(m.avgTime / 5, 100)}%`,
+                backgroundColor: "#36A2EB",
+                borderRadius: 10
+              }}
+            />
+          </View>
         </View>
       ))}
 
-      {/* USAGE */}
-      <Text style={styles.title}>API Usage</Text>
+      {/* INPUT DISTRIBUTION */}
+      <Text style={styles.title}>Input Distribution</Text>
 
-      {metrics.map((m, i) => (
-        <Text key={i} style={{ color: "white", marginBottom: 5 }}>
-          {m.api}: {apiStats[m.api].count} times
-        </Text>
-      ))}
+      {["text", "audio", "image"].map(type => {
+        const percent = totalInputs
+          ? (inputStats[type] / totalInputs) * 100
+          : 0;
+
+        return (
+          <View key={type} style={{ marginBottom: 10 }}>
+            <Text style={{ color: "white" }}>
+              {type.toUpperCase()} ({Math.round(percent)}%)
+            </Text>
+
+            <View style={styles.barBg}>
+              <View
+                style={{
+                  height: "100%",
+                  width: `${percent}%`,
+                  backgroundColor:
+                    type === "text"
+                      ? "#4CAF50"
+                      : type === "audio"
+                      ? "#FF9800"
+                      : "#2196F3",
+                  borderRadius: 10
+                }}
+              />
+            </View>
+          </View>
+        );
+      })}
+
+      {/* IMAGE MODE */}
+      <Text style={styles.title}>Image Mode</Text>
+
+      <Text style={styles.statText}>
+        Translate: {imageStats.translate}
+      </Text>
+      <Text style={styles.statText}>
+        Explain: {imageStats.explain}
+      </Text>
+
+      {/* COMPARE MODE */}
+      <Text style={styles.title}>Compare Mode Usage</Text>
+
+      <Text style={styles.statText}>
+        Used: {compareCount} times
+      </Text>
 
     </ScrollView>
   );
@@ -203,18 +212,8 @@ const styles = StyleSheet.create({
   title: {
     color: "white",
     marginVertical: 10,
-    fontSize: 16
-  },
-  filterRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 10
-  },
-  filter: {
-    color: "white",
-    backgroundColor: "#333",
-    padding: 8,
-    borderRadius: 8
+    fontSize: 16,
+    fontWeight: "bold"
   },
   kpiRow: {
     flexDirection: "row",
@@ -236,5 +235,24 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold"
+  },
+  barBg: {
+    height: 10,
+    backgroundColor: "#333",
+    borderRadius: 10,
+    marginTop: 5
+  },
+  statText: {
+    color: "white",
+    marginBottom: 5
+  },
+  insightCard: {
+    backgroundColor: "#1f1f1f",
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10
+  },
+  insightText: {
+    color: "#00ffcc"
   }
 });
