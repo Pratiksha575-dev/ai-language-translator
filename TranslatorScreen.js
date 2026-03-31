@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useState, useContext,useRef } from 'react';
+import React, { useState, useContext,useRef , useEffect} from 'react';
 import { Audio } from "expo-av";
 import axios from 'axios';
 import * as Speech from "expo-speech";
@@ -48,7 +48,14 @@ export default function TranslatorScreen({  navigation,route}) {
   { label: 'Bengali', value: 'bn' },
   { label: 'Urdu', value: 'ur' },
 ];
-const scrollRef=useRef();
+const scrollRef=useRef(null);
+useEffect(() => {
+  const timeout = setTimeout(() => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, 100);
+
+  return () => clearTimeout(timeout);
+}, [messages]);
 const speechLangMap={
   en:"en-US",
   hi:"hi-IN",
@@ -396,9 +403,9 @@ const startRecording = async () => {
               <Ionicons name="settings-outline" size={24} color="white" style={{ marginRight: 10 }} />
               </TouchableOpacity>
               <TouchableOpacity 
-              onPress={() => alert("Profile feature coming soon!")} 
-              style={{ marginRight: 10 }}
-            >
+  onPress={() => navigation.navigate("Profile")} 
+  style={{ marginRight: 10 }}
+>
               <Ionicons name="person-circle-outline" size={26} color="white" />
           </TouchableOpacity>
             </View>
@@ -463,7 +470,7 @@ const startRecording = async () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           ref={scrollRef}
-          onContentSizeChange={() => scrollRef.current.scrollToEnd({ animated: true })}
+          
         >
           {messages.map((msg, index) => {
             if (msg.type === "image") {

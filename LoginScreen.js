@@ -102,15 +102,32 @@ import {
   SafeAreaView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from "./supabase"; 
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // add at top
 
-  const handleLogin = () => {
-    navigation.replace('Translator');
-  };
+const handleLogin = async () => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    navigation.replace("Translator");
+
+  } catch (err) {
+    console.log(err);
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>

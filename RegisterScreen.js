@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from "./supabase"; 
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -20,15 +21,47 @@ export default function RegisterScreen({ navigation }) {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // add at top
 
-  const registerHandler = () => {
-    if (password !== confirmPassword) {
-      alert("Passwords don't match!");
-      return;
+const registerHandler = async () => {
+  if (password !== confirmPassword) {
+    alert("Passwords don't match!");
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  console.log("AUTH USER:", data.user);
+
+  // 🔥 INSERT INTO USERS TABLE
+  if (data?.user) {
+    const { error: insertError } = await supabase
+      .from("users")
+      .insert([
+        {
+          id: data.user.id,
+          email: data.user.email,
+          name: "New User",
+        }
+      ]);
+
+    if (insertError) {
+      console.log("INSERT ERROR:", insertError.message);
+    } else {
+      console.log("INSERT SUCCESS");
     }
-    alert('Registered successfully!');
-    navigation.replace('Login');
-  };
+  }
+
+  navigation.replace("Login");
+};
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>

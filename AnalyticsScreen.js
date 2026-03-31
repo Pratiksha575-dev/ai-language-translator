@@ -65,12 +65,19 @@ export default function AnalyticsScreen() {
   )
   .map(api => {
     const count = apiStats[api].count;
-
     return {
       api,
       avgTime: count ? apiStats[api].totalTime / count : 0
     };
   });
+  
+   const maxTime = metrics.length
+  ? Math.max(...metrics.map(m => m.avgTime))
+  : 1;
+
+  const minTime = metrics.length
+  ? Math.min(...metrics.map(m => m.avgTime))
+  : 0;
 
   /* ================= INPUT TYPE ================= */
   const inputStats = { text: 0, audio: 0, image: 0 };
@@ -135,8 +142,13 @@ export default function AnalyticsScreen() {
             <View
               style={{
                 height: "100%",
-                width: `${Math.min(m.avgTime / 5, 100)}%`,
-                backgroundColor: "#36A2EB",
+                width: `${Math.max((m.avgTime / maxTime) * 100, 5)}%`,
+                backgroundColor:
+                  m.avgTime === maxTime
+                    ? "#ff4444"   // slowest
+                    : m.avgTime === minTime
+                    ? "#4CAF50"   // fastest
+                    : "#FF9800",  // medium
                 borderRadius: 10
               }}
             />
@@ -164,11 +176,11 @@ export default function AnalyticsScreen() {
                   height: "100%",
                   width: `${percent}%`,
                   backgroundColor:
-                    type === "text"
-                      ? "#4CAF50"
-                      : type === "audio"
-                      ? "#FF9800"
-                      : "#2196F3",
+                  type === "text"
+                    ? "#4CAF50"
+                    : type === "audio"
+                    ? "#FF9800"
+                    : "#2196F3", // medium → orange
                   borderRadius: 10
                 }}
               />
@@ -220,13 +232,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20
   },
+  
   kpiCard: {
-    backgroundColor: "#1f1f1f",
-    padding: 10,
-    borderRadius: 10,
-    width: "30%",
-    alignItems: "center"
-  },
+  backgroundColor: "#1f1f1f",
+  padding: 15,
+  borderRadius: 12,
+  flex: 1,
+  marginHorizontal: 5,
+  alignItems: "center"
+},
+
+
   kpiText: {
     color: "#aaa",
     fontSize: 12

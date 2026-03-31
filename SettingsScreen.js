@@ -93,7 +93,7 @@ import { View, Text, Button, Switch, StyleSheet, Alert, TouchableOpacity } from 
 import { useNavigation } from '@react-navigation/native';
 
 export default function SettingsScreen() {
-  
+  const navigation = useNavigation();
   const [isDarkTheme, setIsDarkTheme] = useState(true); // dark theme by default
 
   const toggleTheme = () => setIsDarkTheme(prev => !prev);
@@ -106,13 +106,7 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDarkTheme ? '#222' : '#fff' }]}>
       
-      {/* Custom Back Button */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={[styles.backText, { color: isDarkTheme ? '#fff' : '#007AFF' }]}>← </Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.title, { color: isDarkTheme ? '#fff' : '#000' }]}>Settings</Text>
-
+        
       {/* Theme Toggle */}
       <View style={styles.row}>
         <Text style={[styles.label, { color: isDarkTheme ? '#fff' : '#000' }]}>Theme</Text>

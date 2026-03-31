@@ -213,25 +213,45 @@ app.post("/image-process", upload.single("image"), async (req, res) => {
 
 if (mode === "translate") {
   prompt = `
-  Extract important readable text from image.
-  Ignore noise.
-  Translate to ${langNames[targetLang]}.
+  Extract ONLY meaningful text from the image.
+
+  Ignore:
+  - noise
+  - symbols
+  - repeated/unreadable text
+
+  Translate into ${langNames[targetLang]}.
+
+  Output rules:
+  - Keep it concise
+  - Maintain original structure (line breaks, headings if present)
+  - Do NOT add extra explanation
+  - Do NOT use symbols like *, -, etc.
+
   Return only clean translated text.
   `;
 }
 
 if (mode === "explain") {
   prompt = `
-  Analyze this image.
+  Analyze the image and respond clearly and concisely.
 
-  If it is a diagram, chart, or architecture:
-  - Explain what it represents
-  - List main components
-  - Explain flow simply
-  - keep explanation concise
+  If it contains TEXT:
+  - Summarize key points
+  - Keep original structure (headings/lines if visible)
 
-  Respond in ${langNames[targetLang]}.
-  Do NOT output raw extracted text.
+  If it is a DIAGRAM / ARCHITECTURE:
+  - What it represents (1-2 lines)
+  - Key components (short list)
+  - Flow or working (brief explanation)
+
+  Rules:
+  - Keep response short and structured
+  - No markdown symbols (*, -, #)
+  - No unnecessary text
+  - Use simple readable format
+
+  Respond in ${langNames[targetLang]} only.
   `;
 }
     const response = await axios.post(
